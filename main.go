@@ -20,7 +20,7 @@ type Product struct {
 var productList []Product
 
 func init() {
-	productsJson := `[
+	productsJSON := `[
 		{
 		  "productId": 1,
 		  "manufacturer": "Johns-Jenkins",
@@ -39,10 +39,20 @@ func init() {
 		  "quantityOnHand": 9217,
 		  "productName": "leg warmers"
 		}]`
-	err := json.Unmarshal([]byte(productsJson), &productList)
+	err := json.Unmarshal([]byte(productsJSON), &productList)
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func getNextID() int {
+	highestID := -1
+	for _, product := range productList {
+		if highestID < product.ProductID {
+			highestID = product.ProductID
+		}
+	}
+	return highestID + 1
 }
 
 func productsHandler(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +64,24 @@ func productsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(productsJSON)
+	case http.MethodPost:
+		var newProduct Product
+		// Replace io.util.ReadAll since it loads the entire file into memory which might not be sufficient and can cause memory leak consider other options
+		// bodyBytes, err := ioutil.ReadAll(r.Body)
 
+		err := json.NewDecoder(r.Body).Decode(&newProduct)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if newProduct.ProductID != 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		newProduct.ProductID = getNextID()
+		productList = append(productList, newProduct)
+		w.WriteHeader(http.StatusCreated)
+		return
 	}
 }
 
