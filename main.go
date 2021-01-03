@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 // Product
@@ -43,6 +45,14 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+func findProductByID(productID int) (*Product, int) {
+	for i, product := range productList {
+		if product.ProductID == productID {
+			return &product, i
+		}
+	}
+	return nil, 0
 }
 
 func getNextID() int {
@@ -85,7 +95,51 @@ func productsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func productHandler(w http.ResponseWriter, r *http.Request) {
+	urlPathSegments := strings.Split(r.URL.Path, "products/")
+	productID, err := strconv.Atoi(urlPathSegments[len(urlPathSegments)-1])
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	product, listItemIndex := findProductByID(productID)
+	if product == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		// Return a product
+		productJSON, err1 := json.Marshal(product)
+		if err1 != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(productJSON)
+	case http.MethodPut:
+		// Update product in the list
+		var updatedProduct Product
+		err = json.NewDecoder(r.Body).Decode(&updatedProduct)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if updatedProduct.ProductID != productID {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		product = &updatedProduct
+		productList[listItemIndex] = *product
+		w.WriteHeader(http.StatusOK)
+		return
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+
+	}
+
+}
 func main() {
 	http.HandleFunc("/products", productsHandler)
+	http.HandleFunc("/products/", productHandler)
 	http.ListenAndServe(":5000", nil)
 }
