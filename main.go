@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Product
@@ -138,8 +140,20 @@ func productHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+func middlewareHandler(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("Before Handler , Middleware Start")
+		start := time.Now()
+		// Processing our intended handler logic
+		handler.ServeHTTP(w, r)
+		fmt.Printf("After Handler , Middleware finished; Time Elapsesd : %s", time.Since(start))
+	})
+}
+
 func main() {
-	http.HandleFunc("/products", productsHandler)
-	http.HandleFunc("/products/", productHandler)
+	productListHandler := http.HandlerFunc(productsHandler)
+	productItemHandler := http.HandlerFunc(productHandler)
+	http.Handle("/products", middlewareHandler(productListHandler))
+	http.Handle("/products/", middlewareHandler(productItemHandler))
 	http.ListenAndServe(":5000", nil)
 }
